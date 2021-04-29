@@ -34,8 +34,8 @@ El set de datos está compuesto por carácterísticas de pacientes, enfocado a c
 Leemos el archivo que vamos a visualizar
 
 ```{r}
-setwd("/home/paulina/Documents/DataScience/Notebooks/")
-dataset <- read.csv("source/cardiovascular_disease.csv")
+setwd("/home/paulina/Documents/DataScience/Notebooks/homeworks/")
+dataset <- read.csv("../source/cardiovascular_disease.csv")
 # Cambiar tipo de dato de la columna gender para mejor manejo de datos
 dataset$gender <- as.character(dataset$gender)
 ```

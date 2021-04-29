@@ -33,8 +33,8 @@ Leemos el archivo que vamos a visualizar
 1. Abre el archivo “cardiovascular_disease.csv” encontrado en cursos en R (todos los descriptores del dataset se encuentran en el archivo llamado “attributes.txt”).
 
 ```{r}
-setwd("/home/paulina/Documents/DataScience/Notebooks/")
-dataset <- read.csv("source/cardiovascular_disease.csv")
+setwd("/home/paulina/Documents/DataScience/Notebooks/homeworks/")
+dataset <- read.csv("../source/cardiovascular_disease.csv")
 ```
 
 #### Características
