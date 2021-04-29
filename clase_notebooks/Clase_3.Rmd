@@ -1,0 +1,500 @@
+---
+title: "Limpieza de datos, extraccion de caracteristicas y reduccion de dimensionalidad"
+author: "Eli Sulvarán Guel"
+date: "<small>`r Sys.Date()`</small>"
+output: 
+  html_document: 
+    toc: yes
+    toc_depth: 3
+    toc_float:
+      collapsed: true
+    cod_folding: hide
+    center: true
+    theme: sandstone
+---
+
+# Llamar librerias 
+Llamamos a la librerias requeridas para los analisis
+```{r}
+library(ggplot2) # graficas
+library(qdap) # manipulacion de datos
+library(e1071) # asimetria
+library(bestNormalize) # transformacion de datos 
+library(fitdistrplus) # grafica Cullen-Frey
+library(dslabs) # datos PCA
+library(factoextra) # graficas PCA
+```
+
+# Limpieza de datos
+Para la primera parte de esta sesion, vamos a utilizar los datos de enfermedades cardiovasculares. Vamos a visualizar las primeras lineas del dataset. 
+```{r warning=FALSE}
+setwd("/Users/elisulvaran/Desktop/LCG/Sexto_Semestre/Asistencia_CDD/Clase_1/Tarea/")
+cvd <- read.csv("cardiovascular_disease.csv") # abrimos el archivo
+head(cvd) # observamos las primeras lineas
+```
+
+### Codificacion
+Sabemos que este dataset contiene informacion sobre pacientes, y una de las columnas (gender) se refiere a su genero. Un valor de 1 en esta columna significa "mujer" y de 2 significa "hombre". Podemos cambiar estos valores por "H" y "M" con la funcion *multigsub()* de la liberaria *qdap*
+```{r}
+cvd$gender <- multigsub(sort(unique(cvd$gender)), # le pasamos el patron que tiene que buscar, que en este caso es 1 y 2
+                        c("M", "H"), # le pasamos el reemplazo que tiene que realizar en el mismo orden que el patron que queremos que busque
+                        cvd$gender) # le pasamos el vector sobre el que queremos que realice los cambios
+
+head(cvd)
+```
+
+Como podemos observar, ahora tenemos esta columna en valores categoricos. Podemos hacer lo mismo pero a la inversa, convirtiendo valores categoricos en numericos
+```{r}
+cvd$gender <- as.factor(multigsub(sort(unique(cvd$gender)), 
+                                  c(0, 1),
+                                  cvd$gender))
+head(cvd)
+```
+
+Notamos que ahora lo tenemos como valores numericos. A esto se le llama codificacion. 
+
+### Discretizacion
+Otro ejemplo de transformaciones sobre nuestros datos lo podemos aplicar a las edades. Primero vamos a visualizar como se distribuyen. 
+```{r}
+summary(cvd$age_year) # resumen de la variable edad
+ggplot(data = cvd, aes(age_year)) + # grafica de la variable edad 
+  geom_histogram(aes(y = ..density..), bins = 100, color = "black", fill = "white") +
+  geom_density(alpha = 0.2, fill = "blue") +
+  labs(title = "Histograma de edades", x = "Edad", y = "Frecuencia")
+```
+
+Podemos notar que la menor edad es 29.58 y la mayor 64.97. Si quisieramos hacer analisis agrupando por edades, seria complicado, pues tendriamos demasiados grupos. Para solucionar este problema, podemos crear intervalos de edades con la funcion *findInterval()*, los cuales iran desde 20 hasta 70. 
+```{r}
+cvd$age_group <- findInterval(cvd$age_year, c(20, 30, 40, 50, 60, 70))
+head(cvd)
+```
+
+Ahora tenemos una columna con las edades. Sin embargo, seria mas util que tuvieramos las edades no por grupos de numeros, sino con los intervalos. Para esto, nuevamente vamos a usar la funcion *multigsub()*. 
+```{r}
+cvd$age_group <- multigsub(sort(unique(cvd$age_group)), # patron a buscar
+                           c("20-30", "30-40", "40-50", "50-60", "60-70"), # reemplazo
+                           cvd$age_group) # objeto sobre el cual reemplazar
+head(cvd)
+```
+
+Las edades ya estan agrupadas por intervalo. Ahora simplemente vamos a graficar la frecuencia de cada grupo de edad. 
+```{r}
+age_group <- as.data.frame(table(cvd$age_group)) # obtenemos frecuencia con table
+
+ggplot(age_group, aes(x = Var1, y = Freq, fill = Var1)) + # graficamos 
+  geom_bar(stat = "identity") +
+  theme(legend.position = "none") +
+  labs(title = "Frecuencia de grupos de edades", x = "Grupo de edad", y = "Frecuencia")
+```
+
+### Eliminar datos faltantes
+Algunas veces, nuestros datasets pueden tener columnas donde algunos de los valores sean NULL o NA. No es el caso del dataset con el que estamos trabajando, entonces vamos a simular un vector que contenga NAs para observar como trabajar con ellos. 
+```{r}
+cvd$Test <- sample(c(1:10, NA), # creamos un sample de un vector con valores del 1 al 10 y NA
+                   prob = 11:1, # asignamos probabilidades a cada elemento
+                   size = 70000, # determinamos el tamaño del dataset
+                   replace = T) # permitimos que el sample se haga con reemplazo. 
+head(cvd)
+```
+
+Como podemos notar, ya tenemos un dataset con una columna con valores faltantes. ¿Que pasa si queremos trabajar con ella?
+```{r}
+mean(cvd$Test) # esto nos devuelve NA, debido a que no todos los valores son numericos. Podemos solucionar este problema especificando el parametro na.rm = TRUE
+mean(cvd$Test, na.rm = TRUE) # ahora si obtenemos la media. 
+```
+
+Pero, ¿que pasaria si quisieramos obtener, por ejemplo, una correlacion? ¿O si quisieramos hacer cualquier cosa que implique trabajar con otra columna?
+```{r}
+cor(cvd$Test, cvd$age_days) # esto nuevamente devuelve NA, y cor no tiene na.rm
+```
+
+Podemos eliminar todas las filas que tienen NA en alguna fila simplemente usando la funcion *na.omit()*. Sin embargo, es importante considerar que dado que se eliminaran las filas completas que contengan valores faltantes, lo mas recomendable siempre es hacer esto desde un inicio para que no haya inconsistencias en nuestros datos, y no trabajemos con objetos de diferentes dimensiones. 
+```{r}
+cvd <- na.omit(cvd)
+dim(cvd) # observamos que ahora tenemos menos observaciones que antes
+```
+
+Con esto ya podemos facilmente obtener medias, correlaciones y graficas sin problemas. 
+```{r}
+mean(cvd$Test)
+cor(cvd$Test, cvd$age_days)
+ggplot(cvd, aes(Test, age_days)) +
+  geom_point() +
+  geom_smooth(method = lm) +
+  labs(title = "Grafica de dispersion entre Test y edad en dias", x = "Test", y = "Edad en dias")
+```
+
+Podemos observar que no existe una correlacion. Pero no importa! Ya sabemos como eliminar datos faltantes :)
+
+
+# Transformacion de datos
+En muchos casos, nos encontraremos con el problema de que nuestros datos no presentan una distribucion normal. Esto puede llegar a ser un problema cuando estamos realizando modelos o pruebas estadisticas (por ejemplo, regresiones lineales), pues casi siempre asumen que los datos siguen una distribucion normal. A pesar de que existen formas de hacer muchos modelos o pruebas diferentes con datos que no tienen distribuciones normales (regresiones lineales generales con *glm()*, por decir alguno), a veces es mas sencillo transformar los datos. Hoy no veremos regresiones lineales, unicamente como modificar nuestros datos para que sigan una distribucion normal. 
+Iniciaremos simulando dos conjuntos de datos, uno con distribucion normal, y otro con distribucion beta. 
+```{r}
+set.seed(42)
+datos_norm <- rnorm(n = 1000, mean = 0, sd = 1) # creamos una distribucion normal
+datos_beta <- rbeta(n = 1000, shape1 = 1, shape2 = 5) # creamos una distribucion beta
+datos <- data.frame(datos_norm, datos_beta) # juntamos las distribuciones en un dataframe
+head(datos) # visualizamos las primeras lineas
+```
+
+### Comparacion de datos normales y no normales
+Vamos a visualizar los datos con ggplot. 
+```{r}
+ggplot(data = datos, aes(datos_norm)) + 
+  geom_histogram(aes(y = ..density..), bins = 100, color = "black", fill = "white") +
+  geom_density(alpha = 0.2, fill = "blue") + 
+  geom_vline(xintercept = mean(datos$datos_norm), color = "red", size = 1) +
+  geom_vline(xintercept = median(datos$datos_norm), color = "forestgreen", size = 1) +
+  labs(title = "Histograma datos normales", x = "Valores", y = "Frecuencia")
+
+ggplot(data = datos, aes(datos_beta)) + 
+  geom_histogram(aes(y = ..density..), bins = 100, color = "black", fill = "white") +
+  geom_density(alpha = 0.2, fill = "blue") + 
+  geom_vline(xintercept = mean(datos$datos_beta), color = "red", size = 1) +
+  geom_vline(xintercept = median(datos$datos_beta), color = "forestgreen", size = 1) +
+  labs(title = "Histograma datos no normales", x = "Valores", y = "Frecuencia")
+```
+
+Podemos hacer otro tipo de visualizaciones, como qqplots. 
+```{r}
+ggplot(datos, aes(sample = datos_norm)) + 
+  stat_qq(alpha = 0.5) + 
+  stat_qq_line(color = "red") + 
+  labs(title = "Grafica cuantil-cuantil datos normales", x = "Teoréticos", y = "Muestra")
+
+ggplot(datos, aes(sample = datos_beta)) + 
+  stat_qq(alpha = 0.5) + 
+  stat_qq_line(color = "red") + 
+  labs(title = "Grafica cuantil-cuantil datos no normales", x = "Teoréticos", y = "Muestra")
+```
+
+Como podemos observar, claramente los datos que creamos no siguen una distribucion normal (en este caso es obvio, pues los creamos con una distribucion beta, pero este tipo de visualizaciones sirven mucho para datasets de los que no tenemos informacion). 
+
+Tambien podemos verificar la asimetria (skewness) de nuestros datos, con la funcion *skewness()* de la libreria *e1071*. 
+```{r}
+skewness(datos$datos_norm) # funcion skewness para verificar asimetria de datos normales
+skewness(datos$datos_beta) # funcion skewness para verificar asimetria de datos no normales
+```
+Si el valor de skewness es cercano a 0, significa que los datos son simetricos o aproximadamente simetricos. 
+Si el valor de skewness se encuentra entre 0.5 y 1 o -0.5 y -1, los datos son ligeramente asimetricos, hacia la izquierda si la asimetria es positiva y hacia la derecha la asimetria es negativa.
+Si el valor de skewness es mayor a 1 o menor a -1, los datos son muy asimetricos. 
+En este caso, podemos observar que nuestros datos normales son simetricos, y nuestros datos de la distribucion beta son muy asimetricos hacia la izquierda (asimetria positiva). 
+
+### Metodos de transformacion 
+Una vez que hemos verificado que nuestros datos son asimetricos, podemos transformarlos. Existen muchas formas de transformar datos. Los metodos mas utilizados son la transformacion con raiz cuadrada para datos ligeramente asimetricos, la transformacion logaritmica para datos un poco mas asimetricos, y la transformacion inversa para datos muy asimetricos. 
+```{r}
+datos$raiz <- sqrt(datos$datos_beta) # transformacion con raiz
+datos$log <- log10(datos$datos_beta) # transformacion con logaritmo base 10
+datos$inversa <- 1 / datos$datos_beta # transformacion con funcion inversa
+head(datos)
+```
+
+Es importante resaltar que esta forma de utilizar las funciones es para datos con asimetria positiva. Si la asimetria es negativa (el histograma se ve inclinado hacia la derecha), debemos primero restar cada observacion mas 1 al valor maximo de los datos, y despues restarle la misma observacion. Posteriormente debemos aplicar el metodo correcto. 
+```{r}
+head(sqrt(max(datos$datos_beta + 1) - datos$datos_beta))
+head(log10(max(datos$datos_beta + 1) - datos$datos_beta))
+head(1 / (max(datos$datos_beta + 1) - datos$datos_beta))
+```
+
+En este caso, no necesitamos estas transformaciones porque la asimetria de nuestros datos es positiva. 
+Ahora podemos graficar los datos previamente transformados
+```{r}
+ggplot(data = datos, aes(raiz)) + 
+  geom_histogram(aes(y = ..density..), bins = 100, color = "black", fill = "white") +
+  geom_density(alpha = 0.2, fill = "blue") + 
+  geom_vline(xintercept = mean(datos$raiz), color = "red", size = 1) +
+  geom_vline(xintercept = median(datos$raiz), color = "forestgreen", size = 1) +
+  labs(title = "Histograma datos transformados con raiz", x = "Valores", y = "Frecuencia")
+
+ggplot(data = datos, aes(log)) + 
+  geom_histogram(aes(y = ..density..), bins = 100, color = "black", fill = "white") +
+  geom_density(alpha = 0.2, fill = "blue") + 
+  geom_vline(xintercept = mean(datos$log), color = "red", size = 1) +
+  geom_vline(xintercept = median(datos$log), color = "forestgreen", size = 1) +
+  labs(title = "Histograma datos transformados con logaritmo", x = "Valores", y = "Frecuencia")
+
+ggplot(data = datos, aes(inversa)) + 
+  geom_histogram(aes(y = ..density..), bins = 100, color = "black", fill = "white") +
+  geom_density(alpha = 0.2, fill = "blue") + 
+  geom_vline(xintercept = mean(datos$inversa), color = "red", size = 1) +
+  geom_vline(xintercept = median(datos$inversa), color = "forestgreen", size = 1) +
+  labs(title = "Histograma datos transformados con funcion inversa", x = "Valores", y = "Frecuencia")
+```
+
+De todas las graficas, podemos observar que la que mejor se ve es la de los datos transformados con raiz. Sin embargo, la funcion *bestNormalize()* de la paqueteria *bestNormalize* nos indica cual es la mejor transformacion para nuestros datos. Ademas de las 3 mencionadas, tiene otras formas de transformarlos, y funciones incluidas para cada una de ellas. 
+```{r}
+set.seed(42)
+bestNormalize(datos$datos_beta)
+```
+
+Podemos observar que bestNormalize nos sugiere utilizar la raiz, que fue el mismo metodo que habiamos notado previamente que normalizaba correctamente nuestros datos. 
+```{r}
+ggplot(datos, aes(sample = raiz)) + 
+  stat_qq(alpha = 0.5) + 
+  stat_qq_line(color = "red") + 
+  labs(title = "Grafica cuantil-cuantil datos transformados con raíz", x = "Teoréticos", y = "Muestra")
+```
+Podemos notar que ahora si, nuestros datos siguen una distribucion normal. Esto facilitaria mucho analisis posteriores, como regresiones lineales. Por ultimo, una funcion adicional que es util para datos de los que no tenemos un conocimiento previo, es *descdist()* de la libreria *fitdistrplus* que nos ayuda a saber que tipo de distribucion siguen nuestros datos mediante una grafica Cullen-Frey.
+```{r}
+descdist(datos$datos_beta)
+descdist(datos$raiz)
+```
+
+El punto azul representa nuestros datos. Para el primer caso, que son los datos sin transformar, observamos que los coloca dentro de una distribucion beta. Sin embargo, para el segundo caso, que son nuestros datos transformados, observamos que el punto se posiciona muy cerca al punto de la distribucion normal. De este modo, podemos conocer la distribucion de nuestros datos de antemano, y saber que tipo de analisis o transformacion es mas conveniente realizar. 
+
+
+# PCA 
+El PCA (Principal Component Analysis o Analisis de Componentes Principales) es un metodo estadistico que nos permite reducir las dimensiones (es decir, las variables o las caracteristicas) de un conjunto de datos, pero preservando la mayor proporcion de la varianza original de estos. 
+
+Imaginemos un conjunto de datos de *n* observaciones y *m* caracteristicas o variables. Debido a que cada variable representa una dimension, nuestro conjunto de datos tiene *m* dimensiones. El PCA busca un numero de caracteristicas menores a las originales pero que expliquen una proporcion de la varianza muy similar a los datos originales. Cada una de estas nuevas caracteristicas es un componente principal. 
+
+El PCA es un algoritmo dentro de los muchos que existen para aprendizaje no supervisado y es muy util cuando queremos realizar regresiones lineales o aprendizaje supervisado en conjuntos de datos muy grandes.  
+
+En este caso, vamos a analizar los datos *"tissue_gene_expression"* de la libreria *dslabs*. Podemos observar que estos datos estan en una lista de dos elementos, x y y. En x encontramos valores de expresion de genes en muchas replicas biologicas de diferentes tejidos, y en y encontramos el tejido al que pertenecen.   
+```{r}
+names(tissue_gene_expression)
+tissue_gene_expression$x[1:7, 1:7] #Imprimimos las primeras 7 fila y columnas de los datos de expresion
+tissue_gene_expression$y[1:7] # Imprimimos los primeros 7 tejidos asociados a cada observacion. 
+```
+
+Notamos que tenemos 189 observaciones (replicas biologicas de tejidos) y 500 caracteristicas (genes). Asimismo, observamos que no tenemos el mismo numero de replicas biologicas para cada tejido. La placenta es el tejido que menos replicas tiene, con 6; y el riñon el que tiene mas, con 39. 
+```{r}
+dim(tissue_gene_expression$x)
+table(tissue_gene_expression$y)
+```
+
+Lo primero que vamos a hacer, es cambiar los nombres de los tejidos de ingles a español. Para esto, vamos a utilizar la funcion *multigsub()*
+```{r}
+tejidos <- c("Cerebelo", "Colon", "Endometrio", "Hipocampo", "Riñón", "Hígado", "Placenta")
+tissue_gene_expression$y <- as.character(tissue_gene_expression$y)
+tissue_gene_expression$y <- multigsub(unique(tissue_gene_expression$y), 
+                                      tejidos, 
+                                      tissue_gene_expression$y)
+table(tissue_gene_expression$y) # observamos que el reemplazo se realizo de forma exitosa. 
+```
+
+### Fundamento matematico detras del PCA
+
+1. Centrar los datos
+
+Si obtenemos la media de cada variable, y posteriormente vemos un resumen de estos datos, notaremos que hay variables con medias muy pequeñas, desde 4.3, y variables con medias muy grandes, hasta 13.43. Por lo tanto, los genes con niveles de expresion muy altos (como RPL3) tendran un mucho mayor impacto en el analisis, y dominaran la mayoria de las componentes principales.
+```{r}
+summary(apply(X = tissue_gene_expression$x, MARGIN = 2, FUN = mean)) # resumen de las medias
+which.min(apply(X = tissue_gene_expression$x, MARGIN = 2, FUN = mean)) # el gen con la media mas pequeña de expresion
+which.max(apply(X = tissue_gene_expression$x, MARGIN = 2, FUN = mean)) # el gen con la media mas grande de expresion
+```
+
+El primer paso del PCA es centrar los datos, lo cual se refiere a que a cada observacion de cada variable le vamos a restar la media de la variable. Esto hace que la media de cada variable sea 0. 
+```{r}
+tge_centered <- apply(tissue_gene_expression$x, 2, function(x){ x - mean(x) }) # centramos las variables utilizando un apply y como funcion, cada variable menos su media. 
+summary(apply(tge_centered, 2, mean)) # obtenemos la media de cada columna. Podemos notar que aunque los valores no son exactamente 0, son muy muy cercanos a 0 por los exponentes
+round(summary(apply(tge_centered, 2, mean)), 12) # redondeamos a 12 decimales para comprobarlo
+```
+
+2. Matriz de covarianzas
+
+El siguiente paso es calcular la matriz de covarianzas, que mide que tanto varian las dimensiones entre ellas. La funcion *cov()* calcula la matriz de covarianzas, y regresa una matriz cuadrada, en este caso de 500*500. 
+```{r}
+tge_covar <- cov(tge_centered)
+tge_covar[1:7, 1:7] # visualizamos 
+dim(tge_covar) # dimensiones de la matriz de covarianzas. 
+```
+
+3. Eigenvalores y eigenvectores
+
+Posteriormente, tenemos que calcular los eigenvalores y eigenvectores de la matriz de covarianzas. La funcion *eigen()* lo hace automaticamente, y regresa una lista con 2 elementos: values y vectors. Los eigenvalores representan que tanta informacion contiene cada componente principal. Estan acomodados de mayor a menor. Los eigenvectores estan acomodados en el orden correspondiente de los eigenvalores y representan los componentes principales.
+```{r}
+tge_eigen <- eigen(tge_covar)
+names(tge_eigen)
+tge_eigen$values[1:7] # primeros 7 eigenvalores
+tge_eigen$vectors[1:7, 1:7] # primeros 7 eigenvectores, con sus 7 primeras filas.
+```
+
+4. Principal component scores
+
+Finalmente, debemos calcular el valor de cada componente principal para cada observacion de los datos centrados. Por lo tanto, tenemos que realizar una multiplicacion matricial con la funcion %*% de las dos matrices transpuestas. Estos ya son los componentes principales finales, pero debido a que utilizamos la multiplicacion de los componentes principales por las observaciones, nuevamente debemos de transponer los datos. 
+```{r}
+tge_scores <- t(tge_eigen$vectors) %*% t(tge_centered)
+tge_pca <- t(tge_scores)
+tge_pca[1:7, 1:7]
+```
+
+¿Y cuando queremos hacer un analisis de componentes principales, es necesario realizar todos estos pasos? No. R tiene dos funciones incluidas para hacer un PCA: *princomp()* y *prcomp()*. En esencia son lo mismo, los resultados que regresan son iguales, pero cambian algunos detalles dentro de la forma en la que calculan los componentes principales. Usualmente, se prefiere la funcion *prcomp()* por dos razones: 
+
+-Tiene mayor exactitud. 
+
+-Puede realizar PCAs aunque los datos tengan mas variables que observaciones (como los que estamos trabajando ahorita), a diferencia de *princomp()*. 
+
+Sin embargo, conocer el fundamento matematico del PCA es util para entender mejor que es lo que estamos observando. Asimismo, nos permite realizar un PCA a partir de otros datos, por ejemplo, matrices de covarianza. 
+
+### PCA generado con *prcomp()*
+Realizamos un PCA de los datos con la funcion *prcomp()*. Observamos que la funcion regresa una lista con 5 elementos: sdev, rotation, center, scale y x. Vamos a ver que contiene cada uno. 
+```{r}
+PCA <- prcomp(tissue_gene_expression$x)
+names(PCA)
+```
+
+$x contiene los principal component scores, que son los mismos que calculamos en el ultimo paso del PCA realizado a mano. Estos son los datos que vamos a utilizar para visualizar. 
+```{r}
+PCA$x[1:7, 1:7] # primeras 7 filas y columnas del PCA realizado con prcomp
+tge_pca[1:7, 1:7] # primeras 7 filas y columnas del PCA realizado a mano
+```
+
+$sdev contiene la desviacion estandar de cada componente principal, que nos sirve para encontrar la proporcion de la varianza explicada por cada uno. Conocer que tanta varianza explica cada PC es muy util para escoger un numero de componentes principales, que veremos mas abajo. Por ahora, es importante resaltar que las desviaciones estandar de cada componente principal van en orden decreciente, por lo que el primer PC siempre es el que mas desviacion estandar tiene (y el que mas varianza explica), y el ultimo el que menos.
+```{r}
+PCA$sdev[1:7] # primeros 7 valores de desviacion estandar de cada PC 
+apply(tge_pca, 2, sd)[1:7] # el PCA que realizamos a mano no tiene las desviaciones estandar asociadas. Para obtenerlas, solo necesitamos obtener la desviacion estandar de cada columna de nuestro PCA con un apply. 
+```
+
+$center contiene las medias de cada columna. Por lo tanto, indica los valores que se le restaron a los datos originales para centrarlos. 
+```{r}
+PCA$center[1:7] # primeras 7 medias
+apply(tissue_gene_expression$x, 2, mean)[1:7] # obtenemos las medias a mano con apply
+```
+
+$rotation contiene los eigenvectores. 
+```{r}
+PCA$rotation[1:7, 1:7] # primeras 7 filas de los primeros 7 eigenvectores del PCA generado con prcomp()
+tge_eigen$vectors[1:7, 1:7] # primeras 7 filas de los primeros 7 eigenvectores del PCA generado a mano
+```
+
+Por ultimo, $scale contiene los valores que se utilizaron para escalar los datos, lo que significa hacer que la desviacion estandar de los datos sea 1 (similar a lo que hicimos para que la media de los datos fuera 0). En este caso, nos regresa FALSE, pues esto no se hizo. Si quisieramos realizar un PCA con la desviacion estandar de 1, tenemos que especificar el parametro scale = TRUE. Asimismo, para escalar un PCA a mano, podemos utilizar la matriz de correlaciones en vez de la matriz de covarianzas. 
+```{r}
+PCA$scale
+```
+
+### Visualizacion del PCA
+##### Graficas de dispersion 
+Ahora que ya tenemos el PCA y sabemos que contiene, vamos a visualizar los dos primeros componentes. 
+```{r}
+PrinComps <- as.data.frame(PCA$x) # convertimos los componentes en un dataframe
+PrinComps$Tissue <- tissue_gene_expression$y # agregamos los grupos de tejidos
+ggplot(PrinComps, aes(x = PC1, y = PC2, color = Tissue)) + # graficamos con ggplot
+  geom_point() +
+  labs(title = "PCA Tejidos", x = "PC1", y = "PC2", color = "Tejido")
+```
+
+Podemos observar a simple vista que con los primeros dos componentes, se agrupan los datos que pertenecen a cerebelo e hipocampo de un lado de la grafica. Asimismo, en otro lugar estan todos los puntos del higado. El colon, endometrio, placenta y riñon se agrupan.
+
+Tambien podemos agregar elipses al rededor de los grupos
+```{r}
+ggplot(PrinComps, aes(x = PC1, y = PC2, color = Tissue)) +
+  geom_point() +
+  stat_ellipse() +
+  labs(title = "PCA Tejidos", x = "PC1", y = "PC2", color = "Tejido")
+```
+
+##### Visualizacion de la varianza explicada
+Primero, vamos a crear una paleta de colores. 
+```{r}
+set.seed(42)
+
+# primera forma, utilizando los colores de rainbow. 
+#color <- sample(rainbow(1000), length(PCA$sdev))
+
+# segunda forma, utilizando todos los colores presentes, a exclusion de los grises. esta fue la forma que yo elegi, pero ambas formas funcionan bien para crear paletas de colores grandes (de nada (;).
+color <- grDevices::colors()[grep('gr(a|e)y', grDevices::colors(), invert = T)]
+color <- sample(color, length(PCA$sdev))
+```
+
+Ahora vamos a obtener la proporcion de la varianza explicada. Para esto, debemos elevar al cuadrado los valores de desviacion estandar, y obtener el porcentaje de la proporcion explicada por cada PC, dividiendo cada valor entre la suma de todos los valores y multiplicandolo por 100. 
+
+```{r}
+exp_var <- PCA$sdev^2
+exp_var <- (exp_var / sum(exp_var)) * 100 # Proporcion de la varianza explicada
+PC <- 1:length(PCA$sdev) # Numero de componentes
+exp_var <- data.frame(exp_var, PC) # Lo unimos en un dataframe
+head(exp_var) 
+
+ggplot(exp_var, aes(x = PC, y = exp_var)) +
+  geom_bar(stat = "identity", fill = color) +
+  labs(title = "Proporcion de la varianza explicada por cada PC", x = "Componente Principal", y = "Varianza explicada (%)")
+```
+
+Observamos que el primer componente principal representa el 33.6% de la varianza, el segundo el 13.7% y asi sucesivamente. ¿Como podemos elegir un numero de componentes? Muchas veces, si el PCA es el objetivo final del analisis, por cuestiones de visualizacion, elegimos solo 2 o 3 componentes, que en nuestro caso expresan el 47.4% de la varianza (nada mal). Sin embargo, si el PCA se esta realizando para posteriormente utilizar un algoritmo de aprendizaje supervisado o una regresion lineal, podemos elegir el numero de componentes que sumen una mayor proporcion de la varianza. Usualmente, se utiliza una varianza total de entre 70% y 90%. Para esto, debemos obtener la suma cumulativa de la proporcion explicada de cada PC
+
+```{r}
+exp_var$var_cum <- cumsum(exp_var$exp_var) # suma cumulativa con funcion cumsum()
+
+for(lim in c(70, 75, 80, 90)){ # vamos a obtener el numero de componentes y a graficarlos para 4 valores de proporcion cumulativa: 70, 75, 80 y 90. 
+  print(exp_var[exp_var$var_cum >= lim, 2][1]) # vemos cual es el componente que otorga la proporcion de la varianza esperada
+  plot <- ggplot(exp_var, aes(x = PC, y = var_cum)) + # graficamos
+    geom_bar(stat = "identity", fill = color) +
+    labs(title = "Varianza cumulativa explicada por cada PC", x = "Componente Principal", y = "Varianza cumulativa explicada") + 
+    geom_hline(yintercept = lim) # colocamos una linea en la proporcion esperada
+  print(plot)
+}
+
+```
+
+Podemos observar que 6 componentes expresan el 70% de la varianza, 7 el 75%, 9 el 80% y 25 el 90%. Aqui ya redujimos la dimensionalidad de los datos originales de 500 a 6, 7, 9 y 25 variables o dimensiones, dependiendo de que tanta varianza queramos. 
+
+##### Contribucion de las variables al PCA
+Muchas veces queremos saber cuales son las variables que mas estan influyendo en los resultados observados. Para esto, podemos utilizar la funcion *fviz_pca_var()* de la libreria *factoextra*, que funciona para graficar. 
+```{r}
+fviz_pca_var(PCA, col.var = "contrib") + # graficamos
+  scale_color_gradient(low = "blue", high = "red") + # escala de color para la contribucion
+  labs(title = "Contribución de cada variable al PCA", # cambiamos textos de la grafica
+       x = paste("PC1 ", "(", round(exp_var$exp_var[1], 2), "%)", sep =""),
+       y = paste("PC2 ", "(", round(exp_var$exp_var[2], 2), "%)", sep =""),
+       color = "Contribución")
+```
+
+En esta grafica, podemos observar cuales son las variables que contribuyen mas significativamente al analisis, siendo las de color rojo. Asimismo, las variables que se agrupan cerca entre ellas son las que se encuentran mas correlacionadas, pues tienen patrones de expresion similares. Las variables que mas contribuyen a la formacion de cada componente son las que se encuentren mas paralelas a ese eje. En este caso, notamos que GPM6B es la variable que mas contribuye al primer componente, y HAMP al segundo. Sin embargo, esta grafica es dificil de visualizar, pues hay muchas variables amontonadas. Para esto, podemos seleccionar algunas cambiando el parametro *select.var* y especificando una lista con contrib = el numero que queremos. 
+
+```{r}
+fviz_pca_var(PCA, col.var = "contrib", # graficamos 
+             select.var = list(contrib = 30)) + # cambiamos el numero de variables
+  scale_color_gradient(low = "blue", high = "red") + # escala de color
+  labs(title = "Contribución de cada variable al PCA", # cambiamos textos de la grafica
+       x = paste("PC1 ", "(", round(exp_var$exp_var[1], 2), "%)", sep =""),
+       y = paste("PC2 ", "(", round(exp_var$exp_var[2], 2), "%)", sep =""),
+       color = "Contribución")
+```
+
+Esta grafica es mucho mas legible, aqui podemos entender mucho mejor cuales son las variables que mas contribuyen al analisis. 
+Por ultimo, podemos añadir los puntos de las observaciones. 
+
+```{r}
+fviz_pca_biplot(PCA, # objeto a visualizar
+                geom.ind = "point", # indicamos que queremos puntos (tambien puede ser texto)
+                fill.ind = tissue_gene_expression$y, # le pasamos los tejidos
+                pointshape = 21, # elegimos el tipo de puntos
+                addEllipses = TRUE, # añadimos las elipses
+                
+                select.var = list(contrib = 30), # seleccionamos 30 variables
+                col.var = "contrib") + # queremos la contribucion de cada variable
+ scale_color_gradient(low = "blue", high = "red") + # escala para la contribucion
+  labs(title = "Contribución de cada variable al PCA", # cambiamos textos de la grafica
+       x = paste("PC1 ", "(", round(exp_var$exp_var[1], 2), "%)", sep =""),
+       y = paste("PC2 ", "(", round(exp_var$exp_var[2], 2), "%)", sep =""),
+       color = "Contribución", fill = "Tejido")
+```
+
+Ahora que ya estamos visualizando las observaciones y las variables, es donde entra la interpretacion biologica. Podemos empezar analizando a que se debe la separacion en conjunto de algunas variables con los tejidos que provienen del cerebro.  [El gen GPM6B](https://www.uniprot.org/uniprot/Q13491) se llama Neuronal membrane glycoprotein M6-b y esta involucrado en el desarrollo neuronal, lo cual explica su asociacion con los tejidos cerebrales. El caso es similar para [El gen SV2B](https://www.uniprot.org/uniprot/Q7L1I2) (Synaptic vesicle glycoprotein 2B), cuya funcion se asocia a la secrecion regulada de neuronas y celulas endocrinas. Por otro lado, el [El gen HAMP](https://www.uniprot.org/uniprot/P81172) (Hepcidin) es una hormona producida por el higado cuya funcion es regular la absorcion y distribucion de hierro a otros tejidos. Debido a su produccion hepatica, es esperada su asociacion con el tejido del higado. Los mismos analisis pueden hacerse para otros genes de interes encontrados en la grafica. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

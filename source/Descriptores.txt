@@ -1,0 +1,26 @@
+HT	Si la paciente esta siendo tratada con placebo o con terapia hormonal
+age	Edad en años
+raceth	"Raza" a la que pertenece la paciente
+nonwhite	Si la paciente no es blanca
+smoking	Si la paciente fuma
+drinkany	Si la paciente toma
+exercise	Si la paciente realiza ejercicio
+physact	Que tanto ejercicio realiza la paciente
+medcond	Si la paciente presenta alguna condicion medica
+htnmeds	Si la paciente toma medicamentos para la hipertension
+statins	Si la paciente toma estatinas
+diabetes	Si la paciente tiene diabetes
+dmpills	Si la paciente toma medicamentos para la diabetes
+insulin	Si la paciente esta bajo insulinoterapia
+weight	Peso de la paciente en kg. 
+BMI	Indice de Masa Corporal
+waist	Medida de la cintura en cm.
+WHR	Proporcion cintura-cadera
+glucose	Medidas de la glucosa en mg/dL
+tchol Colesterol total
+LDL Colesterol de baja densidad
+HDL Colesterol de alta densidad
+TG	Trigliceridos
+SBP	Tension arterial sistolica
+DBP Tension arterial diastolica
+age10	Edad/10

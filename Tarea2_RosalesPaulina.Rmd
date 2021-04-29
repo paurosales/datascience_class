@@ -1,0 +1,315 @@
+---
+title: "<b>Exploración de datos</b>"
+author: "Paulina Rosales Becerra"
+date: "<small>`r Sys.Date()`</small>"
+output:
+  html_document:
+    toc: yes
+    toc_depth: 4
+    toc_float:
+      collapsed: true
+    cod_folding: hide
+    center: true
+    theme: lumen
+---
+
+## General
+
+Los puntos de la tarea vienen indicados con numeración.
+
+### Librerías
+
+Utilizadas para la graficación.
+```{r}
+library(ggplot2)
+library(cowplot)
+library(RColorBrewer)
+
+```
+
+### Datos
+El set de datos está compuesto por carácterísticas de pacientes, enfocado a condiciones cardiovasculares.
+
+#### Obtención
+Leemos el archivo que vamos a visualizar
+
+```{r}
+setwd("/home/paulina/Documents/DataScience/Notebooks/")
+dataset <- read.csv("source/cardiovascular_disease.csv")
+# Cambiar tipo de dato de la columna gender para mejor manejo de datos
+dataset$gender <- as.character(dataset$gender)
+```
+
+#### Características
+
+Las categorías del set de datos son las siguientes:
+```{r}
+names(dataset)
+```
+
+## Filtrado de datos
+
+División en dos grupos de acuerdo al género.
+
+```{r}
+# Filtrar los datos por género
+dataset.female <- dataset[dataset$gender == "1",]
+dataset.male <- dataset[dataset$gender == "2",]
+
+# Además eliminamos aquellos datos que no tengan información (NA)
+dataset.female <- na.omit(dataset.female)
+dataset.male <- na.omit(dataset.male)
+```
+
+### Categorías de interés
+
+Además nos concentraremos en 3 categorías distintas:
+
+- Edad en años
+
+- Peso
+
+- Estaura
+
+Elegí estos datos porque el análisis estadístico tiene más sentido utilizando variables numéricas. Además, para simplificar el manejo de datos eliminaré las categorías que no me interesan.
+
+```{r}
+dataset.female <- dataset.female[,c("age_year", "height", "weight")]
+dataset.male <- dataset.male[,c("age_year", "height", "weight")]
+```
+
+
+### Redondeo de edad
+Para que la edad en años sea máas fácil de interpretar, tomaré en cuenta los años cumplidos sin los meses. Esto lo hharé usando la función <code>floor</code> para redondear al entero menor.
+
+```{r}
+dataset.female$age_year <- floor(dataset.female$age_year)
+dataset.male$age_year <- floor(dataset.male$age_year)
+```
+
+
+## Estadística descriptiva
+
+### Medidas de Tendencia Central
+De cada una de las categorías en en los dos grupos.
+
+Para esto definí una función que me facilite el cáluclo de las Medidas de Tendencia Central:
+
+```{r}
+# FUNCIÓN GENERAL
+CentalTendencies <- function(dataColumn){
+  # Media
+  mean <- mean(dataColumn) 
+  # Moda
+  mode <- data.frame(table(dataColumn))
+  mode <- mode[which.max(mode$Freq), 1]
+  # Mediana
+  median <- median(dataColumn)
+  centralTendMeasures <- c(mean = mean, mode = mode, median = median)
+  return(centralTendMeasures)
+}
+```
+
+
+#### Grupo: Femenino
+
+```{r}
+# Por categoría
+MMM.Age <- CentalTendencies(dataset.female$age_year)
+MMM.Height <- CentalTendencies(dataset.female$height)
+MMM.Weight <- CentalTendencies(dataset.female$weight)
+
+MMM.FemData <- data.frame(Age = MMM.Age, Height = MMM.Height, Weigth = MMM.Weight)
+
+MMM.FemData
+```
+
+#### Grupo: Masculino
+
+```{r}
+# Por categoría
+MMM.Age <- CentalTendencies(dataset.male$age_year)
+MMM.Height <- CentalTendencies(dataset.male$height)
+MMM.Weight <- CentalTendencies(dataset.male$weight)
+
+MMM.MaleData <- data.frame(Age = MMM.Age, Height = MMM.Height, Weigth = MMM.Weight)
+
+MMM.MaleData
+```
+
+
+### Cuartiles
+
+#### Grupo: Femenino
+
+```{r}
+# Por categoría
+quant.Age <- quantile(dataset.female$age_year)
+quant.Height <- quantile(dataset.female$height)
+quant.Weight <- quantile(dataset.female$weight)
+
+quant.FemData <- data.frame(Age = quant.Age, Height = quant.Height, Weigth = quant.Weight)
+
+quant.FemData
+```
+
+#### Grupo: Masculino
+
+```{r}
+# Por categoría
+quant.Age <- quantile(dataset.male$age_year)
+quant.Height <- quantile(dataset.male$height)
+quant.Weight <- quantile(dataset.male$weight)
+
+quant.MaleData <- data.frame(Age = quant.Age, Height = quant.Height, Weigth = quant.Weight)
+
+quant.MaleData
+```
+
+### Desviación Estándar
+
+Referida como <code>SD</code> en el código.
+
+#### Grupo: Femenino
+
+```{r}
+# Por categoría
+SD.Age <- sd(dataset.female$age_year)
+SD.Height <- sd(dataset.female$height)
+SD.Weight <- sd(dataset.female$weight)
+
+SD.FemData <- data.frame(Age = SD.Age, Height = SD.Height, Weigth = SD.Weight)
+
+SD.FemData
+```
+
+#### Grupo: Masculino
+
+```{r}
+# Por categoría
+SD.Age <- sd(dataset.male$age_year)
+SD.Height <- sd(dataset.male$height)
+SD.Weight <- sd(dataset.male$weight)
+
+SD.MaleData <- data.frame(Age = SD.Age, Height = SD.Height, Weigth = SD.Weight)
+
+SD.MaleData
+```
+
+## Resultados
+
+### Distribución de datos
+
+```{r}
+colors <- brewer.pal(6, "Set2")
+# Crear plots por categoría
+
+# EDAD
+box1 <- ggplot(dataset, aes(x = gender, y = age_year))  +
+  geom_boxplot(color = colors[1:2], alpha = 0.2, fill = colors[1:2]) +
+  scale_x_discrete(labels = c("Femenino", "Masculino")) +
+  labs(x = "Género", y = "Edad (años)") 
+
+# ALTURA
+box2 <- ggplot(dataset, aes(x = gender, y = height))  +
+  geom_boxplot(color = colors[3:4], alpha = 0.2, fill = colors[3:4]) +
+  scale_x_discrete(labels = c("Femenino", "Masculino")) +
+  labs(x = "Género", y = "Altura (cm)") 
+
+# PESO
+box3 <- ggplot(dataset, aes(x = gender, y = weight))  +
+  geom_boxplot(color = colors[5:6], alpha = 0.2, fill = colors[5:6]) +
+  scale_x_discrete(labels = c("Femenino", "Masculino")) +
+  labs(x = "Género", y = "Peso (kg)") 
+
+# Unir las gráficas
+plot_grid(box1, box2, box3, labels = "AUTO")
+```
+<div class="alert alert-block alert-success">
+<b id="problem">  Compara los resultados de tus 2 conjuntos, ¿existe alguna diferencia entre
+hombres y mujeres? </b> <p> Las estaturas y pesos del grupo masculino se concentran en la parte superior de la gráfica, lo que indica que los hombres tienden a ser más altos y pesados que las mujeres. </p> <p> La diferencia es más clara en la estatura, sin embargo es importente destacar que ambas categorías tienen valores poco concentrados en la media (muy variantes). </p> <p> La edad no representa un patrón particular de acuerdo al género.</p>
+</div>
+
+### Correlación entre datos
+
+#### Grupo: Femenino
+
+```{r}
+# Género: Femenino
+corelation.FemData <- data.frame(Edad = dataset.female$age_year, Altura = dataset.female$height, Peso = dataset.female$weight)
+corelationVal <- cor(corelation.FemData, method = "p")
+corelationVal
+
+pairs(corelation.FemData, col = colors, main = "Correlación entre categorías")
+```
+#### Grupo: Masculino
+
+```{r}
+corelation.MaleData <- data.frame(Edad = dataset.male$age_year, Altura = dataset.male$height, Peso = dataset.male$weight)
+corelationVal <- cor(corelation.MaleData, method = "p")
+corelationVal
+
+pairs(corelation.MaleData, col = colors, main = "Correlación entre categorías")
+```
+<div class="alert alert-block alert-success">
+<b id="problem">  Interpreta tus resultados y comenta ¿por qué crees que hay o no correlación?. </b> <p> Considero que no hay correlación ya que, tanto los resultados numéricos vistos en las tablas como los puntos en las gráficas, no presentan correlación alguna (valores lejanos a 1 en la tabla y ningún patrón aparente en la gráfica). </p> <p> Esperaba ver algún tipo de relación entre peso y estatura, sin embargo los resultados indicaron lo contrario. </p>
+</div>
+
+### Distribución Normal
+
+#### Grupo: Femenino
+
+```{r}
+set.seed(10)
+
+# Valores principales
+data <- dataset.female$age_year
+mean <-  MMM.FemData$Age[1]
+SD <- SD.FemData$Age
+
+# Valores aleatorios
+rNorm <-rnorm(n = length(data), mean = mean, sd = SD)
+
+# Función de densidad
+density <-seq(0, length(data), length = length(data))
+dNorm <-dnorm(x = density , mean = mean, sd = SD)
+
+# Graficación
+par(mfrow=c(1, 2))
+hist(rNorm,main = "Distribución Normal", freq = F, col = "gray", border = "white", xlim = c(20,80), ylim = c(0, 0.065), xlab = "Edad (años)", ylab = "Densidad")
+lines(density, dNorm, lty = 1, lwd = 2, col = colors[1])
+hist(data, main = "Datos Originales", freq = F, col = "gray", border = "white", xlim = c(20,80), ylim = c(0, 0.065), xlab = "Edad (años)", ylab = "Densidad")
+lines(density, dNorm, col = colors[2], lty = 1, lwd = 2)
+
+```
+
+#### Grupo: Masculino
+
+```{r}
+# Valores principales
+data <- dataset.male$age_year
+mean <-  MMM.MaleData$Age[1]
+SD <- SD.MaleData$Age
+
+# Valores aleatorios
+rNorm <-rnorm(n = length(data), mean = mean, sd = SD)
+
+# Función de densidad
+density <-seq(0, length(data), length = length(data))
+dNorm <-dnorm(x = density , mean = mean, sd = SD)
+
+# Graficación
+par(mfrow=c(1, 2))
+hist(rNorm,main = "Distribución Normal", freq = F, col = "gray", border = "white", xlim = c(20,80), ylim = c(0, 0.065), xlab = "Edad (años)", ylab = "Densidad")
+lines(density, dNorm, lty = 1, lwd = 2, col = colors[5])
+hist(data, main = "Datos Originales", freq = F, col = "gray", border = "white", xlim = c(20,80), ylim = c(0, 0.065), xlab = "Edad (años)", ylab = "Densidad")
+lines(density, dNorm, col = colors[6], lty = 1, lwd = 2)
+
+```
+
+
+<div class="alert alert-block alert-success">
+<b id="problem">  ¿Qué tanto se parecen las distribuciones normales (datos  aleatorios) a los datos originales? </b> <p>En ambos grupos (femenino y masculino) las densidades aleatorias y originales son muy similares. </p> <p> A pesar de no ser exactamente iguales, ambas muestran un patrón similar a los datos aleatorios.</p>
+</div>
+
+

@@ -1,0 +1,286 @@
+---
+title: "<b>Visualización de datos</b>"
+author: "Paulina Rosales Becerra"
+date: "<small>`r Sys.Date()`</small>"
+output:
+  html_document:
+    toc: yes
+    toc_depth: 4
+    toc_float:
+      collapsed: true
+    cod_folding: hide
+    center: true
+    theme: lumen
+---
+
+## General
+
+Los puntos de la tarea vienen indicados con numeración.
+
+### Librería
+
+La única librería utilizada fue <code>ggplot2</code>, útil para la graficación de datos.
+```{r}
+library(ggplot2)
+```
+
+### Datos
+El set de datos está compuesto por carácterísticas de pacientes, enfocado a condiciones cardiovasculares.
+
+#### Obtención
+Leemos el archivo que vamos a visualizar
+
+1. Abre el archivo “cardiovascular_disease.csv” encontrado en cursos en R (todos los descriptores del dataset se encuentran en el archivo llamado “attributes.txt”).
+
+```{r}
+setwd("/home/paulina/Documents/DataScience/Notebooks/")
+dataset <- read.csv("source/cardiovascular_disease.csv")
+```
+
+#### Características
+
+Las categorías del set de datos son las siguientes:
+```{r}
+names(dataset)
+```
+#### Formateo
+
+Se muestran las primeras líneas del set de datos para darnos una idea la estructura de los datos. Nótese que el tipo de dato de variables categóricas o binarias es <code>integer</code>, dichas variables son modificadas a <code>character</code> para poder manejarlas como categóricas.
+
+```{r}
+dataset$cardio <- as.character(dataset$cardio)
+dataset$gender <- as.character(dataset$gender)
+dataset$smoke <- as.character(dataset$smoke)
+head(dataset)
+```
+
+## Visualización
+
+De acuerdo a la categoría y objetivo se aplica un tipo de gráfica barras, *pie*, disperción, *boxplot*, etc.) que facilite la comprensión de los datos y sus tendencias.
+
+### Gráfica de barras
+
+2. Realiza una gráfica de barras con el número de pacientes que se encuentran en cada grupo discreto de la variable colesterol.
+
+Para esto primero realizamos el conteo de casos por la categoría de colesterol (*cholesterol* en los datos). 
+
+```{r}
+# Extraer los datos relevantes (niveles de colesterol)
+counts <- table(dataset$cholesterol) 
+counts <- as.data.frame(counts)
+counts
+```
+
+Además convertiremos los datos a un formato *long* que nos permitirá graficar con la función <code>ggplot</code>.
+
+```{r}
+# Graficar las frecuencias de pacientes con niveles de colesterol
+ggplot(counts, aes(x = Var1, y = Freq, fill = Var1)) +
+  geom_bar(stat = "identity") + 
+  theme(legend.position = "none") +
+  labs(title = "Frecuencia de niveles de colesterol", x = "Nivel de colesterol", y = "Número de pacientes") +
+  scale_x_discrete(labels = c("Normal", "Por encima de lo normal", "Muy por encima de lo normal"))
+```
+
+
+3. Realiza una gráfica de barras con el número de pacientes que se encuentran en cada grupo discreto de la variable colesterol agrupada por ausencia o presencia de una enfermedad cardiovascular. 
+
+Es necesario hacer un conteo condicional, es decir, de acuerdo a los estados de ambas variables (colesterol y enfermedad cardiovascular).
+
+```{r}
+# Contar pacientes por nivel de colesterol para ausencia y presencia de enfermedad cardiovascular (CVD)
+double_counts <- tapply(dataset$cholesterol, 
+                  list(dataset$cholesterol, dataset$cardio), 
+                  table)
+# Convertir a formato manejable
+double_counts <- as.data.frame(double_counts)
+# Incluir las variables de la categoría colesterol como renglones
+double_counts$Colesterol <- rownames(double_counts)
+double_counts
+```
+
+Transformamos los datos a formato *long* de nuevo para la graficación.
+
+```{r}
+# Transformar el dataframe a formato long
+double_counts <- reshape(double_counts,
+        direction = "long",
+        varying = list(names(double_counts)[1:2]), #L Columnas con las cuentas
+        v.names = "Counts",
+        idvar = "Colesterol", # Identificadores en la variable Colessterol
+        timevar = "Cardiovascular", # Variable a alargar
+        times = c("no", "yes"))
+
+# Eliminamos los nombres de los renglones
+row.names(double_counts) <- NULL
+double_counts
+```
+
+
+```{r}
+# Frecuencia de pacientes por nivel de colesterol para ausencia y presencia de enfermedad cardiovascular
+ggplot(double_counts, aes(x = Colesterol, y = Counts, fill = Cardiovascular)) +
+  geom_bar(stat = "identity",  position=position_dodge()) +
+  scale_fill_discrete(name = "Enfermedad \nCardiovacular", labels = c("No", "Sí")) +
+  scale_x_discrete(labels = c("Normal", "Por encima\nde lo normal", "Muy por encima\nde lo normal")) +
+  labs(title = "Frecuencia de enfermedades cardiovasculares\nde acuerdo a niveles de colesterol", x = "Niveles de colesterol", y = "Número de pacientes") +
+  theme(axis.text.x = element_text(angle = 90))
+```
+
+
+<div class="alert alert-block alert-success">
+<b id="problem">  ¿Encuentras alguna asociación entre ambas variables? </b> <p> Si, en los dos casos en los que el nivel de colesterol es superior al normal la presencia de enfermedades cardivasculares supera la ausencia de las mismas. Además en el caso de colesterol normal, la presencia de enfermedades cardiovasculares es menor que la ausencia. </p>
+Es decir, la presencia de enfermedades cardiovasculares se relaciona con el aumento de colesterol.
+</div>
+
+### Histograma
+
+4. Realiza un histograma de la variable estatura y coloca una gráfica de densidad encima.
+
+
+```{r}
+# Histograma de densidad de estaturas
+ggplot(dataset, aes(x = height)) +  
+  geom_histogram(aes(y=..density..), binwidth = 2, color = "white", fill = "gray") +
+  geom_density(alpha = 0.2, fill = "yellow", color = "orange") + 
+  labs(title = "Distribución de las estaturas", x = "Estatura (cm)", y = "Densidad")
+```
+
+5. Realiza un histograma de la variable estatura agrupada por género. 
+
+```{r}
+# Histograma de densidad de estaturas y género
+ggplot(dataset, aes(x = height, color = gender)) +  
+  geom_histogram(binwidth = 2.5) + 
+  labs(title = "Distribución de las estaturas", x = "Estatura (cm)", y = "Densidad") + 
+  scale_color_discrete(name = "Género", labels = c("Mujer", "Hombre")) 
+```
+
+<div class="alert alert-block alert-success">
+<b id="problem">  ¿Encuentras alguna asociación entre ambas variables? </b> <p> Las estaturas de los hombres se concentran en el lado derecho de la distribución, lo que indica que los hombres tienden a ser más altos que las mujeres. </p>
+</div>
+
+### Gráficas de dispersión
+
+6. Realiza una gráfica de dispersión con las variables tensión arterial sistólica y tensión arterial diastólica (limita el eje x a 250 y el eje y a 200). Coloca una línea de regresión encima.
+
+```{r message=FALSE, warning=FALSE}
+# Gráfica de dispersión y relación entre presiones arteriales 
+ ggplot(dataset, aes(x = ap_hi, y = ap_lo)) +
+  geom_point(color = "#4d4d4d") +
+  xlim(0, 250) +
+  ylim(0, 200) +
+  geom_smooth(method = lm, color = "#d73027") +
+  labs(title = "Relación entre presiones arteriales", x = "Presión sistólica (mmHg)", y = "Presión diastólica (mmHg)")
+```
+
+<div class="alert alert-block alert-success">
+<b id="problem">  ¿Encuentras alguna asociación entre ambas variables? </b> <p> Si, según la regresión ambas variables (tensión arterial sistólica y diastólica) aumentan de acuerdo a la otra. </p>
+</div>
+
+7. Realiza una gráfica de dispersión con las variables tensión arterial sistólica y tensión arterial diastólica (limita el eje x a 250 y el eje y a 200), agrupada por la presencia o ausencia de una enfermedad cardiovascular.
+
+```{r warning=FALSE}
+# Gráfica de dispersión y relación entre presiones arteriales y enfermedades cardiovasculares
+ ggplot(dataset, aes(x = ap_hi, y = ap_lo, color = cardio)) +
+  geom_point() +
+  xlim(0, 250) +
+  ylim(0, 200) +
+  geom_vline(xintercept = 130) +
+  geom_hline(yintercept = 80) +
+  labs(title = "Relación entre presiones arteriales y enfermedad cardiovascular", x = "Presión sistólica (mmHg)", y = "Presión diastólica (mmHg)") +
+  scale_color_discrete(name = "Enfermedad \nCardiovacular", labels = c("No", "Sí"))
+```
+
+<div class="alert alert-block alert-success">
+<b id="problem">  ¿Qué relación crees que existe entre estas tres variables? </b> <p> Se relacionan de manera directa, particularmente para las presiones altas (hipertensión): superiones a 130 mmHg (sistólica)  y/o inferiores a 80 mmHg (diastólica). </p> 
+La hipertensión resulta ser una condición altamente relacionada con enfermedades cardiovasculares. 
+</div>
+
+### *Boxplot*
+
+8. Realiza un *boxplot* con la variable peso y la variable de enfermedad cardiovascular.
+
+```{r}
+# Relación peso y enfermedades cardiovasculares
+ggplot(dataset, aes(x = cardio, y = weight)) + 
+  geom_boxplot(color = "#66c2a5", fill = "#abdda4") +
+  scale_x_discrete(labels = c("No", "Sí")) +
+  labs(title = "Relación Peso-Enfermedad cardiovascular", x = "Enfermedad cardiovascular", y = "Peso (kg)") 
+```
+
+<div class="alert alert-block alert-success">
+<b id="problem">  ¿Qué puedes deducir sobre el peso de los pacientes con enfermedades cardiovasculares? </b> <p> Tiende a ser mayor que el de pacientes sin enfermedades cardiovasculares. A pesar de que en la gráfica no se ve gran diferencia a simple vista, si nos fijamos en la escala vemos que las medianas difieren por ~10 kg. </p>
+</div>
+
+9. Realiza un boxplot con la variable peso y la variable de enfermedad cardiovascular, agrupadas por la variable “fumar”.
+
+```{r}
+# Relación peso, enfermedades cardiovasculares y fumar
+ggplot(dataset, aes(x = cardio, y = weight, color = smoke)) + 
+  geom_boxplot() +
+  scale_x_discrete(labels = c("No", "Sí")) +
+  scale_color_discrete(name = "Fuma", labels = c("No", "Sí")) +
+  labs(title = "Relación Peso-Enfermedad cardiovascular-Fumar", x = "Enfermedad cardiovascular", y = "Peso (kg)") 
+```
+
+<div class="alert alert-block alert-success">
+<b id="problem">¿Qué relación existe entre las tres variables? </b> <p> Entre la presencia y ausencia de enfermedades cardiovasculares, los pacientes con enfermedades cardiovasculares tienen mayor peso. Además en ambos casos las personas que fuman pesan más. Así el subgrupo con mayo peso son pacientes que fuman y enfermedades cardiovasculares.</p>
+</div>
+
+### *Heatmap*
+
+10. Realiza un *heatmap* de la edad en años, la presión arterial sistólica, la presión arterial diastólica, la estatura y el peso, contra los grupos obtenidos de las combinaciones entre las variables colesterol y enfermedad cardiovascular (debes obtener un heatmap de 6x5).
+
+```{r}
+# Extraer datos de interés
+hm_data <- aggregate(dataset[,c(3,5:8)], 
+          by = list(dataset$cholesterol, dataset$cardio), # Agrupar por dos categorías (CVD - colesterol)
+          median, na.rm = T) # Obtener mediana
+
+# Combinar las dos categorías de comparación en una sola
+Group.1 <-sort(unique(paste(dataset$cardio, dataset$cholesterol, sep = "-")))
+# Datos originales
+hm_data
+
+# Sustituir las dos categorías por una combinada (debe coincidir con el orden de los datos originales)
+hm_data <- cbind(Group.1, hm_data[,3:7])
+# Datos modificados
+hm_data
+```
+
+```{r}
+# Transformar de datos a formato long
+hm_data <- reshape(hm_data, 
+                   direction = "long", 
+                   varying = list(names(hm_data)[2:6]),
+                   v.names = "Value", 
+                   idvar = "Group.1",
+                   timevar = "Variable", 
+                   times = colnames(hm_data)[2:6])
+
+# Eliminar nombres de los renglones
+row.names(hm_data) <- NULL
+```
+
+Los datos son de categorías muy distintas, lo que lo vuelve poco comparables (numéricas y categóricas). Por esta razón es necesario normalizarlos.
+
+```{r}
+# Normalizar de datos
+hm_data$Value <- log(hm_data$Value)
+# Datos normalizados
+hm_data[1:15,]
+```
+
+
+```{r}
+# Heatmap para ver la relación de las variables
+ggplot(hm_data, aes(x = Variable, y = Group.1, fill = Value)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "#c7eae5", high = "#01665e", mid = "#35978f", midpoint = median(hm_data$Value)) + 
+  labs(title = "Relación entre variables de los pacientes", x = "", y = "Enfermedad cardiovascular (CVD)\nNivel de colesterol", fill = "Valor\nnormalizado") +
+  scale_y_discrete(labels = c("No CVD\nNormal", "No CVD\nPor encima\nde lo normal", "No CVD\nMuy por encima\nde lo normal","CVD\nNormal", "CVD\nPor encima\nde lo normal", "CVD\nMuy por encima\nde lo normal")) +
+  scale_x_discrete(labels = c("Edad", "Presión arterial\nsistólica", "Presión arterial\ndiastólica", "Altura", "Peso"))
+```
+
+

@@ -1,0 +1,250 @@
+---
+title: "Clase3"
+author: "ObedEs"
+date: "4/18/2021"
+output:
+  html_document:
+    toc: yes
+    toc_depth: 3
+    toc_float:
+      collapsed: yes
+    cod_folding: hide
+    center: yes
+    theme: sandstone
+  pdf_document:
+    toc: yes
+    toc_depth: '3'
+---
+# Lectura de Archivos
+Para este trabajo utilizaremos los datos utilizados en la clase anterior. Nos enfocaremos en la comparación entre bebedores y no bebedores. 
+```{r}
+setwd("~/Asistencias/Clase2/Data")
+hers <- read.table("hersdata.csv",sep = ",",header = T)
+#Existen otras funciones como read.csv,read.csv2 o read.delim (sep= “,” “;” “\” respectivamente)
+```
+# Exploración de los datos 
+Para observar los pocos registros de nuestros datos podemos utilizar head() para los primeros registros o tail() para los últimos.
+```{r}
+#el parametro n es el numero registros que nos va a mostrar
+head(hers,n = 6)
+#tail(hers)
+```
+Para observar las dimensiones de nuestros datos podemos utilizar las funciones dim() o nrow() y ncol().
+```{r}
+dim(hers)
+#numero de registros 
+nrow(hers)
+#numero de caracterisiticas 
+ncol(hers)
+```
+Podemos utilizar la función table() para contabilizar cuántos registros de cada clase tenemos. 
+```{r}
+table(hers$drinkany)
+```
+# Separación de los datos
+Generamos 2 conjuntos de datos uno para bebedores y otro para no bebedores (ignoraremos los registros que no tengan informacion).
+R permite indexar vectores con otros vectores así que obtendremos y ordenar y separar fácilmente datos 
+```{r}
+drinkanyData.yes<-hers[hers$drinkany=="yes",]
+dim(drinkanyData.yes)
+#La diferencia entre usar which retorna los indices que cumplen la condicion y el otro es un vector booleano
+drinkanyData.no<-hers[which(hers$drinkany=="no"),]
+dim(drinkanyData.no)
+```
+Otras funciones utiles son sort y order que permiten ordenar un  lista de elementos
+sort devuelve un vector ordenado de los valores (sin contar NA) de la lista y order el índice de los valores ordenados
+El siguiente ejemplo ordena los datos por edad
+```{r}
+#para que sort devuelva el indice del valor y poder utilizarlo para ordenar un dataframe se utiliza el parametro index.return=T
+orden<-sort(drinkanyData.yes$age,index.return=T)$ix
+drinkanyData.yes<-drinkanyData.yes[orden,]
+head(drinkanyData.yes[,1:6])
+orden<-order(drinkanyData.no$age)
+drinkanyData.no<-drinkanyData.no[orden,]
+head(drinkanyData.no[,1:6])
+```
+
+# Estadistica descriptiva
+
+### Moda,media, mediana (medidas de tendencia central )
+Calcularemos la media, moda y mediana de Triglicéridos(TG) para observar si hay diferencia entre bebedores y no bebedores
+```{r}
+#Eliminamos los valores nulos para no tener errores
+drinkanyData.yes<-na.omit(drinkanyData.yes)
+drinkanyData.no<-na.omit(drinkanyData.no)
+media<-mean(drinkanyData.yes$TG)
+#R no tiene una funcion para calcular la moda pero se puede calcular con table y which
+modaT<-data.frame(table(drinkanyData.yes$TG))
+moda<-modaT[which.max(modaT$Freq),1]
+mediana<-median(drinkanyData.yes$TG)
+MMMyes<-c(media=media,moda=moda,mediana=mediana)
+
+media<-mean(drinkanyData.no$TG)
+modaT<-data.frame(table(drinkanyData.no$TG))
+moda<-modaT[which.max(modaT$Freq),1]
+mediana<-median(drinkanyData.no$TG)
+MMMno<-c(media=media,moda=moda,mediana=mediana)
+```
+```{r}
+dt<-data.frame(MMMyes,MMMno)
+dt
+```
+Como se puede observar existen diferencias en ambos, principalmente un pequeño desplazamiento en la distribución de los datos. Intentemos observar un poco más la distribución de los datos de nuestro conjunto. 
+
+### Cuantiles
+
+Los Cuantiles nos permiten dividir  nuestros datos de tal manera que cada que todas las partes tengan la misma cantidad de datos y permiten ver la distribución de nuestros datos.Los más utilizados son los cuartiles,deciles y percentiles y R tiene una función para calcular todos,quantile()
+```{r}
+par(mfrow=c(2, 2))
+#quantile(data,prob=seq(0, 1, 1/X)) X es el numero de partes a dividir los datos
+plot(quantile(drinkanyData.no$TG, prob=seq(0, 1, 1/100)),xlab = "Porcentaje" ,ylab = "Triglicéridos",main="No Bebedores")
+plot(quantile(drinkanyData.yes$TG, prob=seq(0, 1, 1/100)),xlab = "Porcentaje" ,ylab = "Triglicéridos", main="Bebedores")
+#los Boxplots son buenos para mostrar los cuartiles
+boxplot(drinkanyData.no$TG, main="No Bebedores")
+boxplot(drinkanyData.yes$TG,main="Bebedores")
+```
+
+De esta manera podemos observar cómo se distribuyen los datos y algunos valores muy alejados de los datos (outliers)
+### La forma fácil 
+R tiene una función que permite visualizar de forma fácil todos estos cálculos, summary() devuelve el valor más bajo, el valor más alto, el cuartil 1,2,3 (los valores que ocupan el 25%,50% y 75%) y la media.
+
+```{r}
+summary_yes<-summary(drinkanyData.yes$TG)
+summary_no<-summary(drinkanyData.no$TG)
+summary_d<-data.frame(c(summary_no),c(summary_yes))
+summary_d
+```
+
+Summary tambien funciona en todos los datos de un dataframe 
+
+```{r}
+summary(drinkanyData.yes)
+```
+
+# Varianza y Desviación estándar
+```{r}
+varianza<-var(drinkanyData.yes$TG)
+desEst<-sd(drinkanyData.yes$TG)
+var_sd_yes<-c(var=varianza,des=desEst)
+
+varianza<-var(drinkanyData.no$TG)
+desEst<-sd(drinkanyData.no$TG)
+var_sd_no<-c(var=varianza,des=desEst)
+
+var_sd<-data.frame(var_sd_yes,var_sd_no)
+var_sd
+```
+# Correlación y covarianza
+La covarianza es un valor que indica el grado de variación de 2 conjuntos de datos con respecto a su media y su versión normalizada es la correlación. 
+R cuenta con una función para calcular la correlación y covarianza entre 2 conjuntos de datos, cor(). 
+A continuación se correlacionó el índice de masa corporal, con el peso y Triglicéridos(TG). 
+```{r}
+dtCorr<-data.frame(BMI=drinkanyData.yes$BMI,Weight=drinkanyData.yes$weight,TG=drinkanyData.yes$TG)
+#Cov y Cor funcionan en un dataframe si todos los datos son numericos 
+cov(dtCorr)
+```
+```{r}
+#el parametro method permite cambiar entre la correlacion a calcular "pearson" (default), "kendall", or "spearman" 
+cor(dtCorr,method = "p")
+cor(dtCorr,method = "s")
+cor(dtCorr,method = "k")
+#la funcion cor.test() tambien regresa el pvalue del calculo
+
+```
+Entre más cercano a 1 sea el valor absoluto de correlación, la relación entre los 2 conjuntos de datos será más fuerte la relación entre los datos.
+R también cuenta con una función para observar la correlación entre múltiples variables de un dataframa produciendo un diagrama de dispersión (scatterplot) por cada par de datos, pairs(),
+```{r}
+pairs(dtCorr)
+```
+Como podemos observar el IMC y  con el peso correlaciona casi a la perfección, cosa que ya esperábamos, por otra parte los Triglicéridos(TG)  son independientes al IMC y al peso.
+
+# Distribuciones de probabilidad 
+
+Permite generar simulaciones de datos con distintas distribuciones de probabilidad y cada una se identifica por un alias, las más importantes son: 
+binomial(binom), Poisson(pois),normal(norm), exponencial(exp), t de Student(t),chi^2(chisq),Distribución F(f),uniforme(unif, etc para la lista completa help(Distributions).
+
+Para cada distribución hay 4 funciones relacionadas que se anotan como prefijo al alias de la función Función de distribución o probabilidad(p), Función cuantílica(p) que regresa el percentil solicitado, Función de densidad (continuas) o de probabilidad (discretas) (d) y Números aleatorios (r)
+
+Estas funciones son muy útiles para generar grandes conjuntos de datos aleatorios con una distribución de nuestro interés y compararlos con nuestros datos o usarlos como un grupo de control. 
+
+### Normal
+Para mas informacion de las funciones [norm()](https://r-coder.com/distribucion-normal-r/)
+Utilicemos la media y la desviación estándar de los datos de Bebedores para generar una distribución normal y compararlas.
+```{r}
+#distribucion normal
+set.seed(10)
+DatosTG<-drinkanyData.yes$TG
+MediaTG<-summary_d$c.summary_yes[4]
+SdTG<-var_sd$var_sd_yes[2]
+#Generamos un arreglo de longitud n con una distribucion normal con una media (mean) y desviacion estandar (sd)
+Dnormal<-rnorm(n=1020,mean = MediaTG,sd = SdTG)
+#qnorm calcula el cuantil p, en este caso calcula los cuartiles
+QuarNorm<-qnorm(p=seq(0, 1, 1/4),mean = MediaTG,sd = SdTG)
+#pnorm calcula la probabilidad de que una variable aleatoria sea menor que q
+Quar_DD<-quantile(drinkanyData.yes$TG, prob=seq(0, 1, 1/4))
+ProbNorm_datos<-pnorm(q=Quar_DD,mean = MediaTG,sd = SdTG)
+#pnorm al ingresar quantiles generados con los mismos parametros como resultado el valor p de qnorm
+ProbNorm_normal<-pnorm(q=QuarNorm,mean = MediaTG,sd = SdTG)
+#comparemos con nuestros datos
+
+dt_norm_Vs_Datos<-data.frame(Quar_DD,QuarNorm,ProbNorm_normal,ProbNorm_datos)
+dt_norm_Vs_Datos
+```
+```{r}
+#calcula la funcion de densiada
+x<-seq(0, 1020, length = 1020)
+distNorm<-dnorm(x=x,mean = MediaTG,sd = SdTG)
+#imprimamos los datos
+par(mfrow=c(1, 2))
+hist(Dnormal,main = "normal",freq = F,ylim =  c(0,0.008))
+lines(x,distNorm,col = "blue", lty = 1, lwd = 2)
+hist(DatosTG,main = "Datos",freq = F,ylim =  c(0,0.008))
+lines(x,distNorm,col = "blue", lty = 1, lwd = 2)
+```
+Estos gráficos nos muestran las distribuciones de los datos reales y los datos generados por rnorm() junto con una curva de densidad normal. 
+A continuación se muestran algunas distribuciones. 
+
+### Exponencial y uniforme
+Para más formación de estas funciones en R 
+[Exponencial](https://r-coder.com/distribucion-uniforme-r/) y 
+[uniforme](https://r-coder.com/distribucion-exponencial-r/)
+```{r}
+x <- seq(-10, 10, 0.01)
+set.seed(10)
+par(mfrow=c(1, 2))
+#Exponencial 
+hist(rexp(1000), main = "n = 1000",
+     xlab = "", prob = TRUE)
+lines(x, dexp(x), col = "red", lwd = 2)
+#Uniforme
+hist(runif(1000), main = "n = 1000", xlim = c(-0.2, 1.25),
+     xlab = "", prob = TRUE)
+lines(x, dunif(x), col = "red", lwd = 2)
+```
+
+
+### Poisson y Binomial
+Para más formación de estas funciones en R
+[Poisson ](https://r-coder.com/distribucion-poisson-r/) y
+[Binomial](https://r-coder.com/distribucion-binomial-r/)
+```{r}
+par(mfrow=c(1, 2))
+x<-seq(0, 1, 0.001)
+#la función cuantil de la distribución de Poisson
+plot(qpois(x, lambda = 20),
+     main = "Poisson",
+     ylab = "Q(p)", xlab = "p",
+     type = "s", col = 3, xaxt = "n")
+
+axis(1, labels = seq(0, 1, 0.1), at = 0:10 * 100)
+
+# la función cuantil binomia size = 80, prob = 0.2
+plot(qbinom(x, size = 80, prob = 0.2),
+     main = "binomial",
+     ylab = "Q(p)", xlab = "p",
+     type = "s", col = 2, xaxt = "n")
+axis(1, labels = seq(0, 1, 0.1), at = 0:10 * 100)
+
+```
+  
+  
